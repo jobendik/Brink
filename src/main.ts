@@ -12,15 +12,35 @@ import { Audio_ } from './audio/engine'
 import { update } from './game/update'
 import { render } from './render/render'
 import { hydrateSettings } from './game/settings'
+import { STATE } from './game/constants'
 import './input/input'
 
+/**
+ * Optional looping music track. Drop an MP3 at `public/music/brink-loop.mp3`
+ * and it plays during runs (replacing the built-in synth bed). If the file is
+ * absent the game keeps its procedural soundtrack — nothing breaks.
+ * Set to '' to force the procedural soundtrack.
+ */
+const MUSIC_URL = `${import.meta.env.BASE_URL}music/brink-loop.mp3`
+
 let last = performance.now()
+let prevState = G.state
 function frame(now: number): void {
   let dt = (now - last) / 1000
   last = now
   if (dt > 0.05) dt = 0.05
   update(dt)
   render()
+  // music follows the run: play during PLAYING, pause otherwise
+  if (G.state !== prevState) {
+    if (G.state === STATE.PLAYING) {
+      if (prevState === STATE.PAUSE) Audio_.resumeMusic()
+      else Audio_.restartMusic()
+    } else {
+      Audio_.pauseMusic()
+    }
+    prevState = G.state
+  }
   requestAnimationFrame(frame)
 }
 
@@ -30,6 +50,7 @@ async function boot(): Promise<void> {
   window.CrazyGames?.SDK?.game?.sdkGameLoadingStart?.()
 
   await hydrateSettings()
+  if (MUSIC_URL) Audio_.setMusicTrack(MUSIC_URL)
 
   const mute = await Store.get('brink_mute')
   if (mute === '1') Audio_.muted = true

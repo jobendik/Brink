@@ -20,6 +20,13 @@ export const Audio_ = {
   running: false,
   PENT: [0, 3, 5, 7, 10] as number[],
 
+  // optional streamed music track. When it plays, it replaces the procedural
+  // bed (the SFX keep firing). Routed through `master`, so mute affects it too.
+  music: null as HTMLAudioElement | null,
+  musicSrc: null as MediaElementAudioSourceNode | null,
+  musicGain: null as GainNode | null,
+  musicActive: false,
+
   init(): void {
     if (this.ctx) return
     const AC = window.AudioContext || window.webkitAudioContext
@@ -54,6 +61,63 @@ export const Audio_ = {
 
   now(): number {
     return this.ctx ? this.ctx.currentTime : 0
+  },
+
+  /* --- streamed music track (optional) --- */
+  setMusicTrack(url: string): void {
+    if (!url) return
+    if (!this.music) {
+      const el = new Audio()
+      el.loop = true
+      el.preload = 'auto'
+      this.music = el
+    }
+    this.music.src = url
+  },
+
+  /** Play the track (creating its audio graph once). `fromStart` restarts it. */
+  playMusic(fromStart: boolean): void {
+    const el = this.music
+    if (!el) return
+    this.init()
+    this.resume()
+    if (this.ctx && this.master && !this.musicSrc) {
+      try {
+        this.musicGain = this.ctx.createGain()
+        this.musicGain.gain.value = 0.55
+        this.musicSrc = this.ctx.createMediaElementSource(el)
+        this.musicSrc.connect(this.musicGain)
+        this.musicGain.connect(this.master)
+      } catch (e) {
+        /* ignore */
+      }
+    }
+    if (fromStart) {
+      try {
+        el.currentTime = 0
+      } catch (e) {
+        /* ignore */
+      }
+    }
+    const p = el.play()
+    if (p && typeof p.then === 'function') {
+      p.then(() => {
+        this.musicActive = true
+        this.stop() // real music took over — silence the procedural bed
+      }).catch(() => {
+        /* no track present / autoplay blocked — keep the procedural bed */
+      })
+    }
+  },
+
+  restartMusic(): void {
+    this.playMusic(true)
+  },
+  resumeMusic(): void {
+    this.playMusic(false)
+  },
+  pauseMusic(): void {
+    if (this.music) this.music.pause()
   },
 
   /* --- voices --- */

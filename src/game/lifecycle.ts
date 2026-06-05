@@ -83,7 +83,7 @@ export function startRun(mode: Mode): void {
   G.newBest = false
   G.tut = mode === 'tutorial' ? { phase: 0, t: 0, moved: 0, passed: 0, grazed: 0 } : null
   Audio_.bpm = 132
-  Audio_.start()
+  if (!Audio_.musicActive) Audio_.start() // procedural bed, unless a music track has taken over
   if (mode === 'tutorial') addToast('TRAINING REACTOR', 'c')
   else {
     addToast('REACTOR ONLINE', 'c')
