@@ -31,6 +31,8 @@ import { Audio_ } from '../audio/engine'
 import { GRAZE_TIERS, nextRank, rankFor, SIGS, STATE } from '../game/constants'
 import { dprog } from '../game/spawn'
 import { toastColor } from '../game/fx'
+import { fxScale, Settings } from '../game/settings'
+import { canVibrate } from '../game/haptics'
 import { isTouch } from '../platform'
 import type { ButtonRect, CircleRect, Wall } from '../types'
 
@@ -42,7 +44,7 @@ export function render(): void {
   ctx.fillStyle = hsl(baseHue, 60, 4, 1)
   ctx.fillRect(0, 0, W, H)
 
-  const sh = G.shake
+  const sh = G.shake * fxScale.shake
   const ox = (Math.random() - 0.5) * sh * minDim * 0.012
   const oy = (Math.random() - 0.5) * sh * minDim * 0.012
   ctx.save()
@@ -63,7 +65,7 @@ export function render(): void {
   drawVignette()
   if (G.flash > 0) {
     ctx.globalCompositeOperation = 'lighter'
-    ctx.fillStyle = rgba(255, 255, 255, G.flash * 0.5)
+    ctx.fillStyle = rgba(255, 255, 255, G.flash * 0.5 * fxScale.flash)
     ctx.fillRect(0, 0, W, H)
     ctx.globalCompositeOperation = 'source-over'
   }
@@ -75,7 +77,12 @@ export function render(): void {
   if (G.state === STATE.MENU) drawMenu()
   if (G.state === STATE.DEAD) drawDead()
   if (G.state === STATE.PAUSE) drawPause()
-  drawMuteIcon()
+  if (G.settingsOpen) {
+    drawSettings()
+  } else {
+    drawMuteIcon()
+    drawSecondaryIcon()
+  }
 }
 
 function pulse(amp: number, freq = 1): number {
@@ -825,4 +832,110 @@ function drawMuteIcon(): void {
     ctx.stroke()
   }
   ctx.restore()
+}
+
+/* ---------- secondary top-right control: pause (in play) / gear (menus) ---------- */
+export function secondaryIconRect(): CircleRect {
+  const r = minDim * 0.03
+  return { x: W - SAR - minDim * 0.135, y: SAT + minDim * 0.05, r }
+}
+
+function drawSecondaryIcon(): void {
+  const b = secondaryIconRect()
+  if (G.state === STATE.PLAYING) {
+    // pause glyph (two bars)
+    ctx.fillStyle = 'rgba(255,255,255,0.5)'
+    const bw = b.r * 0.34
+    const bh = b.r * 1.2
+    const gap = b.r * 0.34
+    ctx.fillRect(b.x - gap - bw, b.y - bh / 2, bw, bh)
+    ctx.fillRect(b.x + gap, b.y - bh / 2, bw, bh)
+  } else if (G.state === STATE.MENU || G.state === STATE.PAUSE || G.state === STATE.DEAD) {
+    // gear glyph
+    ctx.save()
+    ctx.translate(b.x, b.y)
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)'
+    ctx.fillStyle = 'rgba(255,255,255,0.5)'
+    ctx.lineWidth = 2 * scl
+    ctx.beginPath()
+    ctx.arc(0, 0, b.r * 0.6, 0, TAU)
+    ctx.stroke()
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * TAU
+      ctx.beginPath()
+      ctx.moveTo(Math.cos(a) * b.r * 0.6, Math.sin(a) * b.r * 0.6)
+      ctx.lineTo(Math.cos(a) * b.r, Math.sin(a) * b.r)
+      ctx.stroke()
+    }
+    ctx.beginPath()
+    ctx.arc(0, 0, b.r * 0.26, 0, TAU)
+    ctx.fill()
+    ctx.restore()
+  }
+}
+
+/* ---------- settings modal ---------- */
+export let settingsBtns: Record<string, ButtonRect> = {}
+
+function toggleRow(cx: number, cy: number, w: number, h: number, label: string, on: boolean): ButtonRect {
+  const x = cx - w / 2
+  const y = cy - h / 2
+  const r = h * 0.28
+  roundRect(x, y, w, h, r)
+  ctx.fillStyle = 'rgba(255,255,255,0.06)'
+  ctx.fill()
+  ctx.strokeStyle = on ? hsl(190, 90, 65, 0.9) : 'rgba(255,255,255,0.22)'
+  ctx.lineWidth = 2 * scl
+  ctx.stroke()
+  // label
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'middle'
+  ctx.font = `700 ${Math.round(h * 0.34)}px "Bahnschrift",sans-serif`
+  ctx.fillStyle = '#eafcff'
+  ctx.fillText(label, x + h * 0.55, cy)
+  // pill switch
+  const pw = h * 1.5
+  const ph = h * 0.5
+  const px = x + w - h * 0.4 - pw
+  roundRect(px, cy - ph / 2, pw, ph, ph / 2)
+  ctx.fillStyle = on ? hsl(190, 90, 55, 0.55) : 'rgba(255,255,255,0.12)'
+  ctx.fill()
+  const kx = on ? px + pw - ph / 2 : px + ph / 2
+  ctx.beginPath()
+  ctx.arc(kx, cy, ph * 0.4, 0, TAU)
+  ctx.fillStyle = on ? '#eafcff' : 'rgba(255,255,255,0.55)'
+  ctx.fill()
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'alphabetic'
+  return { x, y, w, h }
+}
+
+function drawSettings(): void {
+  ctx.fillStyle = 'rgba(4,3,14,0.86)'
+  ctx.fillRect(0, 0, W, H)
+  const cx = CX
+  ctx.textAlign = 'center'
+  ctx.fillStyle = '#eafcff'
+  ctx.font = `700 ${Math.round(minDim * 0.06)}px "Bahnschrift",sans-serif`
+  ctx.fillText('SETTINGS', cx, CY - minDim * 0.2)
+
+  const rowW = Math.min(minDim * 0.72, W - SAL - SAR - minDim * 0.1)
+  const rowH = minDim * 0.1
+  const gap = minDim * 0.028
+  let y = CY - minDim * 0.08
+  settingsBtns = {}
+  settingsBtns.sound = toggleRow(cx, y, rowW, rowH, 'SOUND', !Audio_.muted)
+  y += rowH + gap
+  settingsBtns.motion = toggleRow(cx, y, rowW, rowH, 'REDUCED MOTION', Settings.reducedMotion)
+  y += rowH + gap
+  if (canVibrate) {
+    settingsBtns.haptics = toggleRow(cx, y, rowW, rowH, 'HAPTICS', Settings.haptics)
+    y += rowH + gap
+  }
+  y += gap
+  settingsBtns.done = button(cx, y + rowH * 0.45, rowW * 0.6, rowH * 0.9, 'DONE', '#38e8ff', true)
+
+  ctx.font = `600 ${Math.round(minDim * 0.022)}px "Bahnschrift",sans-serif`
+  ctx.fillStyle = 'rgba(255,255,255,0.4)'
+  ctx.fillText('Reduced Motion dims flashes, shake & zoom', cx, H - SAB - minDim * 0.05)
 }

@@ -17,7 +17,21 @@ no art or audio assets.
   Surge ring is full.
 - **Graze:** pass as close to a wall edge as you dare — closer grazes score
   more, build your multiplier and charge Surge.
+- **Pause:** tap the `❚❚` button (top-right) during play, or press `Esc`.
+- **Settings:** tap the ⚙ gear (menu / pause) or press `S`.
 - **Mute:** tap the speaker icon or press `M`.
+
+## Features
+
+- **Installable PWA** — add to home screen and play **offline** (web app
+  manifest + service worker).
+- **Haptics** — distinct vibration feedback for big grazes, near-misses, the
+  combo shield, milestones, overdrive and death (mobile; toggleable).
+- **Accessibility** — a **Reduced Motion** mode dims the screen flashes, camera
+  shake, chroma split and zoom punch. It defaults on when the OS
+  `prefers-reduced-motion` setting is enabled, and can be toggled in Settings.
+- **Daily anomaly** — a deterministic, shareable daily seed with a named
+  modifier, plus an endless mode, ranks, streaks and a run recap.
 
 ## Tech stack
 
@@ -28,10 +42,16 @@ no art or audio assets.
 ## Project structure
 
 ```
+public/
+├── manifest.webmanifest # PWA manifest (installability)
+├── icon.svg             # app / favicon icon
+├── icon-maskable.svg    # maskable PWA icon
+└── sw.js                # offline service worker
 src/
-├── main.ts              # entry: boot + main loop
+├── main.ts              # entry: boot + main loop + SW registration
 ├── style.css            # global styles (safe-area aware)
 ├── global.d.ts          # ambient types (window.storage, CrazyGames SDK)
+├── vite-env.d.ts        # Vite client types (import.meta.env)
 ├── platform.ts          # touch capability detection
 ├── types.ts             # shared entity/config interfaces
 ├── utils/
@@ -43,10 +63,12 @@ src/
 ├── render/
 │   ├── canvas.ts        # context, viewport metrics, geometry, primitives
 │   ├── glow.ts          # pre-rendered glow sprites
-│   └── render.ts        # full scene + HUD + menu/dead/pause draw
+│   └── render.ts        # full scene + HUD + menu/dead/pause/settings draw
 ├── game/
 │   ├── constants.ts     # ranks, graze tiers, anomalies, states
 │   ├── state.ts         # the mutable game state `G`
+│   ├── settings.ts      # reduced-motion + haptics settings & fx scaling
+│   ├── haptics.ts       # Vibration API wrapper + named patterns
 │   ├── fx.ts            # shared toast/particle helpers
 │   ├── spawn.ts         # wall spawning + pattern scheduler
 │   ├── update.ts        # per-frame simulation

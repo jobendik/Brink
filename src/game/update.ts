@@ -20,6 +20,8 @@ import { dprog, speedNow, spawnInterval, spawnWall } from './spawn'
 import { addToast, trimParticles } from './fx'
 import { tutorialTick } from './tutorial'
 import { die } from './lifecycle'
+import { fxScale } from './settings'
+import { HAPTIC, vibrate } from './haptics'
 import type { Wall } from '../types'
 
 export function update(dt: number): void {
@@ -38,13 +40,19 @@ export function update(dt: number): void {
   G.comboFlash = Math.max(0, G.comboFlash - real * 2.2)
   G.heartPulse = Math.max(0, G.heartPulse - real * 3.5)
   G.touchFlash = Math.max(0, G.touchFlash - real * 4)
-  G.vignette = lerp(G.vignette, G.overdrive > 0 ? 0.0 : G.danger * 0.6, Math.min(1, real * 7))
-  G.chroma = lerp(G.chroma, G.overdrive > 0 ? 7 : G.surge * 3.5 + G.danger * 3, Math.min(1, real * 5))
-  G.zoom = lerp(
-    G.zoom,
-    (G.overdrive > 0 ? 1.06 : 1) * (G.state === STATE.DEAD ? 0.97 : 1) + G.heartPulse * 0.012,
-    Math.min(1, real * 4),
+  G.vignette = lerp(
+    G.vignette,
+    (G.overdrive > 0 ? 0.0 : G.danger * 0.6) * fxScale.vignette,
+    Math.min(1, real * 7),
   )
+  G.chroma = lerp(
+    G.chroma,
+    (G.overdrive > 0 ? 7 : G.surge * 3.5 + G.danger * 3) * fxScale.chroma,
+    Math.min(1, real * 5),
+  )
+  const zoomTarget =
+    (G.overdrive > 0 ? 1.06 : 1) * (G.state === STATE.DEAD ? 0.97 : 1) + G.heartPulse * 0.012
+  G.zoom = lerp(G.zoom, 1 + (zoomTarget - 1) * fxScale.zoom, Math.min(1, real * 4))
 
   for (const s of G.stars) {
     s.a += s.sp * sdt
@@ -99,6 +107,7 @@ function updatePlay(sdt: number, real: number): void {
       G.rings.push({ x: CX, y: CY, r: PLAYER_R(), v: -700 * scl, life: 0.5, t: 0, col: 'g', w: 5 })
       addToast('SURGE SPENT', 'g')
       Audio_.overdriveEnd()
+      vibrate(HAPTIC.overdriveEnd)
     }
   } else {
     G.surge = Math.max(0, G.surge - real * 0.055)
@@ -311,6 +320,8 @@ function registerGraze(close: number, _w: Wall): void {
     G.hitstop = Math.max(G.hitstop, T.micro)
     G.comboFlash = 1
   }
+  if (idx >= 4) vibrate(HAPTIC.grazeInsane)
+  else if (idx >= 3) vibrate(HAPTIC.grazeBig)
   Audio_.graze(G.combo, T.pitch)
 
   checkMilestones()
@@ -326,6 +337,7 @@ function checkMilestones(): void {
     G.comboFlash = 1
     G.shake = Math.min(2.2, G.shake + 0.5)
     Audio_.flourish(Math.min(3, G.nextMileIdx))
+    vibrate(HAPTIC.milestone)
   }
 }
 
@@ -342,6 +354,7 @@ function nearMiss(): void {
   G.flash = Math.max(G.flash, 0.2)
   addToast('EDGE BREACH', 'm')
   Audio_.nearmiss()
+  vibrate(HAPTIC.nearMiss)
 }
 
 function consumeShield(_w: Wall, i: number): void {
@@ -373,6 +386,7 @@ function consumeShield(_w: Wall, i: number): void {
   G.rings.push({ x: px, y: py, r: 10, v: 420 * scl, life: 0.55, t: 0, col: 'c', w: 4 })
   G.pops.push({ x: px, y: py, t: 0, life: 0.9, txt: 'SHIELD!', big: true, col: 'c' })
   Audio_.shield()
+  vibrate(HAPTIC.shield)
   G.walls.splice(i, 1)
   trimParticles()
 }
@@ -434,4 +448,5 @@ export function triggerOverdrive(): void {
   G.pops.push({ x: CX, y: CY - PLAYER_R() * 0.4, t: 0, life: 1.0, txt: 'OVERDRIVE', big: true, od: true, col: 'g' })
   trimParticles()
   Audio_.overdriveStart()
+  vibrate(HAPTIC.overdrive)
 }

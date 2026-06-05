@@ -11,6 +11,7 @@ import { G } from './game/state'
 import { Audio_ } from './audio/engine'
 import { update } from './game/update'
 import { render } from './render/render'
+import { hydrateSettings } from './game/settings'
 import './input/input'
 
 let last = performance.now()
@@ -25,7 +26,10 @@ function frame(now: number): void {
 
 async function boot(): Promise<void> {
   resize()
+  registerServiceWorker()
   window.CrazyGames?.SDK?.game?.sdkGameLoadingStart?.()
+
+  await hydrateSettings()
 
   const mute = await Store.get('brink_mute')
   if (mute === '1') Audio_.muted = true
@@ -56,6 +60,14 @@ async function boot(): Promise<void> {
 
   window.CrazyGames?.SDK?.game?.sdkGameLoadingStop?.()
   requestAnimationFrame(frame)
+}
+
+/** Register the offline service worker (production builds only). */
+function registerServiceWorker(): void {
+  if (!import.meta.env.PROD || !('serviceWorker' in navigator)) return
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register(import.meta.env.BASE_URL + 'sw.js').catch(() => {})
+  })
 }
 
 boot()

@@ -101,6 +101,9 @@ export interface GameState {
   nextMileIdx: number
   tut: Tut | null
   countedStreakToday?: boolean
+
+  // ui
+  settingsOpen: boolean
 }
 
 export const G: GameState = {
@@ -171,4 +174,5 @@ export const G: GameState = {
   touchFlash: 0,
   nextMileIdx: 0,
   tut: null,
+  settingsOpen: false,
 }

@@ -10,6 +10,7 @@ import { G } from './state'
 import { Audio_ } from '../audio/engine'
 import { SIGS, STATE } from './constants'
 import { addToast, trimParticles } from './fx'
+import { HAPTIC, vibrate } from './haptics'
 import type { Mode } from '../types'
 
 export function startRun(mode: Mode): void {
@@ -126,6 +127,7 @@ export function die(): void {
   addToast('CORE COLLAPSE', 'r')
   Audio_.die()
   Audio_.stop()
+  vibrate(HAPTIC.death)
   // tutorial run: never recorded; mark done so it won't show again
   if (G.mode === 'tutorial') {
     G.tutDone = true

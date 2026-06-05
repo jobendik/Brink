@@ -8,7 +8,16 @@ import { STATE } from '../game/constants'
 import { Audio_ } from '../audio/engine'
 import { startRun, toMenu } from '../game/lifecycle'
 import { triggerOverdrive } from '../game/update'
-import { deadBtns, menuBtns, muteRect, odBtnRect } from '../render/render'
+import {
+  deadBtns,
+  menuBtns,
+  muteRect,
+  odBtnRect,
+  secondaryIconRect,
+  settingsBtns,
+} from '../render/render'
+import { Settings, setHaptics, setReducedMotion } from '../game/settings'
+import { HAPTIC, vibrate } from '../game/haptics'
 import { isTouch } from '../platform'
 import type { ButtonRect, CircleRect } from '../types'
 
@@ -31,10 +40,45 @@ function hitCircle(b: CircleRect, p: Point): boolean {
   return Math.hypot(p.x - b.x, p.y - b.y) <= b.r
 }
 
+function handleSettingsTap(p: Point): void {
+  if (hit(settingsBtns.done, p)) {
+    G.settingsOpen = false
+    return
+  }
+  if (hit(settingsBtns.sound, p)) {
+    Audio_.setMuted(!Audio_.muted)
+    return
+  }
+  if (hit(settingsBtns.motion, p)) {
+    setReducedMotion(!Settings.reducedMotion)
+    return
+  }
+  if (hit(settingsBtns.haptics, p)) {
+    setHaptics(!Settings.haptics)
+    vibrate(HAPTIC.toggle) // confirms only when haptics ends up enabled
+    return
+  }
+}
+
 function onDown(p: Point, id: PointerId): void {
+  if (G.settingsOpen) {
+    handleSettingsTap(p)
+    return
+  }
   if (hitCircle(muteRect(), p)) {
     Audio_.setMuted(!Audio_.muted)
     return
+  }
+  // secondary top-right control: pause during play, open settings in menus
+  if (hitCircle(secondaryIconRect(), p)) {
+    if (G.state === STATE.PLAYING) {
+      G.state = STATE.PAUSE
+      return
+    }
+    if (G.state === STATE.MENU || G.state === STATE.PAUSE || G.state === STATE.DEAD) {
+      G.settingsOpen = true
+      return
+    }
   }
   if (G.state === STATE.MENU) {
     if (hit(menuBtns.play, p)) {
@@ -166,6 +210,14 @@ window.addEventListener('keydown', (e) => {
   const k = e.key.toLowerCase()
   if (k === 'm') {
     Audio_.setMuted(!Audio_.muted)
+    return
+  }
+  if (G.settingsOpen) {
+    if (k === 'escape' || k === 's' || k === 'enter') G.settingsOpen = false
+    return
+  }
+  if (k === 's' && (G.state === STATE.MENU || G.state === STATE.PAUSE)) {
+    G.settingsOpen = true
     return
   }
   if (G.state === STATE.MENU) {
